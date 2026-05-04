@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Trening</title>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cdefs%3E%3CclipPath id='r'%3E%3Crect width='500' height='500' rx='110'/%3E%3C/clipPath%3E%3C/defs%3E%3Crect width='250' height='500' fill='%234a9e6e' clip-path='url(%23r)'/%3E%3Crect x='250' width='250' height='500' fill='%23c45a5a' clip-path='url(%23r)'/%3E%3Crect x='246' width='8' height='500' fill='rgba(26,26,46,0.12)' clip-path='url(%23r)'/%3E%3Ctext x='125' y='295' text-anchor='middle' font-family='monospace' font-size='88' font-weight='700' fill='rgba(255,255,255,0.95)'%3EDUO%3C/text%3E%3Ctext x='375' y='295' text-anchor='middle' font-family='monospace' font-size='72' font-weight='700' fill='rgba(255,255,255,0.95)'%3ESOLO%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cdefs%3E%3CclipPath id='r'%3E%3Crect width='500' height='500' rx='110'/%3E%3C/clipPath%3E%3C/defs%3E%3Crect width='250' height='500' fill='%234a9e6e' clip-path='url(%23r)'/%3E%3Crect x='250' width='250' height='500' fill='%23c45a5a' clip-path='url(%23r)'/%3E%3Crect x='246' width='8' height='500' fill='rgba(26,26,46,0.12)' clip-path='url(%23r)'/%3E%3Ctext x='125' y='295' text-anchor='middle' font-family='monospace' font-size='88' font-weight='700' fill='rgba(255,255,255,0.95)'%3EDUO%3C/text%3E%3Ctext x='375' y='295' text-anchor='middle' font-family='monospace' font-size='72' font-weight='700' fill='rgba(255,255,255,0.95)'%3ESOLO%3C/text%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Trening">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -269,7 +274,34 @@ body {
 }
 .stat-row-val { font-size: 20px; font-weight: 400; line-height: 1; }
 
-/* TOAST */
+/* EXPORT / IMPORT */
+.io-section {
+  padding: 14px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.io-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--rs);
+  padding: 14px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 0.15s, color 0.15s;
+}
+.io-btn:active { border-color: var(--ink); color: var(--ink); }
+#import-input { display: none; }
 .toast {
   position: fixed;
   bottom: 24px;
@@ -335,6 +367,24 @@ body {
   <div class="stats-grid" id="stats-grid"></div>
 </div>
 
+<div class="section-divider" style="margin-top:14px"></div>
+
+<div class="io-section">
+  <button class="io-btn" onclick="exportData()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Eksporter
+  </button>
+  <button class="io-btn" onclick="document.getElementById('import-input').click()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M7 13V5M4 8l3-3 3 3M2 3h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Importer
+  </button>
+  <input type="file" id="import-input" accept=".json" onchange="importData(event)">
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -377,6 +427,11 @@ function weekDates() {
   return Array.from({length:7}, (_, i) => { const d = new Date(ws); d.setDate(ws.getDate()+i); return d; });
 }
 
+function weekOffForDate(dateStr) {
+  const target = mondayOf(new Date(dateStr + 'T12:00:00'));
+  const current = mondayOf(new Date());
+  return Math.round((target - current) / (7 * 24 * 60 * 60 * 1000));
+}
 function changeWeek(n) { weekOff += n; render(); }
 function changeMonth(n) { monthOff += n; renderCal(); renderStats(); }
 
@@ -478,7 +533,7 @@ function renderCal() {
     cell.innerHTML = `
       <div class="cal-num-wrap"><span class="cal-num">${day}</span></div>
       <div class="cal-dots">${dots}</div>`;
-    cell.onclick = () => { activeDay = key; render(); };
+    cell.onclick = () => { activeDay = key; weekOff = weekOffForDate(key); render(); };
     grid.appendChild(cell);
   }
 }
@@ -542,6 +597,43 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(t._tid);
   t._tid = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function exportData() {
+  const data = load();
+  const json = JSON.stringify(data, null, 2);
+  const today = new Date();
+  const dstr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const filename = `trening-backup-${dstr}.json`;
+  const blob = new Blob([json], { type: 'application/json' });
+  const file = new File([blob], filename, { type: 'application/json' });
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: filename }).catch(() => {});
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
+      save(parsed);
+      render();
+      toast('Data importert ✓');
+    } catch {
+      toast('Ugyldig fil');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 render();
