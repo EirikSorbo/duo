@@ -274,34 +274,35 @@ body {
 }
 .stat-row-val { font-size: 20px; font-weight: 400; line-height: 1; }
 
-/* EXPORT / IMPORT */
-.io-section {
-  padding: 14px 16px 32px;
+/* APP HEADER */
+.app-header {
+  padding: 8px 12px 8px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--edge);
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
 }
-.io-btn {
+.header-actions { display: flex; gap: 6px; }
+
+/* EXPORT / IMPORT */
+.data-btn {
+  background: none;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  color: var(--muted);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  background: var(--paper);
-  border: 1px solid var(--edge);
-  border-radius: var(--rs);
-  padding: 14px;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
   font-family: 'Geist Mono', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  cursor: pointer;
-  width: 100%;
-  transition: border-color 0.15s, color 0.15s;
 }
-.io-btn:active { border-color: var(--ink); color: var(--ink); }
-#import-input { display: none; }
+.data-btn:active { background: var(--edge); color: var(--ink); }
+
 .toast {
   position: fixed;
   bottom: 24px;
@@ -324,6 +325,16 @@ body {
 </style>
 </head>
 <body>
+
+<div class="app-header">
+  <div style="width:66px"></div>
+  <div style="flex:1"></div>
+  <div class="header-actions">
+    <button class="data-btn" onclick="exportData()" title="Eksporter">↑</button>
+    <button class="data-btn" onclick="document.getElementById('import-input').click()" title="Importer">↓</button>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</div>
 
 <div class="week-nav">
   <button class="nav-btn" onclick="changeWeek(-1)">‹</button>
@@ -365,24 +376,6 @@ body {
 
 <div class="stats-section">
   <div class="stats-grid" id="stats-grid"></div>
-</div>
-
-<div class="section-divider" style="margin-top:14px"></div>
-
-<div class="io-section">
-  <button class="io-btn" onclick="exportData()">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    Eksporter
-  </button>
-  <button class="io-btn" onclick="document.getElementById('import-input').click()">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M7 13V5M4 8l3-3 3 3M2 3h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    Importer
-  </button>
-  <input type="file" id="import-input" accept=".json" onchange="importData(event)">
 </div>
 
 <div class="toast" id="toast"></div>
