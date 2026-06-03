@@ -517,13 +517,14 @@ function renderCal() {
     grid.appendChild(el);
   }
 
-  // Build set of dates that fall within a pause range (pause day + 5 following days)
+  // Build pause range: check from 5 days before month start through end of month
   const pauseRangeDates = new Set();
-  for (let day = 1; day <= daysInMo; day++) {
-    const key = `${yr}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  for (let offset = -5; offset <= daysInMo; offset++) {
+    const d = new Date(yr, mi, 1 + offset);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if (all[key] && all[key].pause) {
-      for (let offset = 0; offset <= 5; offset++) {
-        const rd = new Date(yr, mi, day + offset);
+      for (let r = 0; r <= 5; r++) {
+        const rd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + r);
         pauseRangeDates.add(`${rd.getFullYear()}-${String(rd.getMonth()+1).padStart(2,'0')}-${String(rd.getDate()).padStart(2,'0')}`);
       }
     }
