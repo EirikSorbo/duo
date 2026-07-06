@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trening</title>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cdefs%3E%3CclipPath id='r'%3E%3Crect width='500' height='500' rx='110'/%3E%3C/clipPath%3E%3C/defs%3E%3Crect width='250' height='500' fill='%234a9e6e' clip-path='url(%23r)'/%3E%3Crect x='250' width='250' height='500' fill='%233d7cb5' clip-path='url(%23r)'/%3E%3Crect x='246' width='8' height='500' fill='rgba(26,26,46,0.12)' clip-path='url(%23r)'/%3E%3Ctext x='125' y='295' text-anchor='middle' font-family='monospace' font-size='88' font-weight='700' fill='rgba(255,255,255,0.95)'%3EDUO%3C/text%3E%3Ctext x='375' y='295' text-anchor='middle' font-family='monospace' font-size='72' font-weight='700' fill='rgba(255,255,255,0.95)'%3ESOLO%3C/text%3E%3C/svg%3E">
@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Trening">
+<meta name="theme-color" content="#faf8f4">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -388,6 +390,10 @@ body {
 <div class="toast" id="toast"></div>
 
 <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
 const DAYS_NO   = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
 const DAYS_LONG = ['Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag','Søndag'];
 const MONTHS_NO = ['Januar','Februar','Mars','April','Mai','Juni','Juli','August','September','Oktober','November','Desember'];
@@ -396,7 +402,10 @@ const SOLO_C  = '#3d7cb5';
 const PAUSE_C = '#c45a5a';
 
 function load() { try { return JSON.parse(localStorage.getItem('ds_v1') || '{}'); } catch { return {}; } }
-function save(d) { localStorage.setItem('ds_v1', JSON.stringify(d)); }
+function save(d) {
+  try { localStorage.setItem('ds_v1', JSON.stringify(d)); return true; }
+  catch { return false; }
+}
 
 function ds(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -420,7 +429,18 @@ function isoWeek(d) {
 let weekOff  = 0;
 let monthOff = 0;
 let activeDay = ds(new Date());
-const TODAY   = ds(new Date());
+let TODAY    = ds(new Date());
+
+// Recompute "today" when the app is reopened after being left open (e.g. across midnight).
+function refreshToday() {
+  const now = ds(new Date());
+  if (now === TODAY) return;
+  if (activeDay === TODAY) { activeDay = now; weekOff = 0; } // follow the rollover only in "live" mode
+  TODAY = now;
+  render();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshToday(); });
+window.addEventListener('focus', refreshToday);
 
 function weekDates() {
   const ws = mondayOf(new Date());
@@ -440,10 +460,11 @@ function toggle(type) {
   const all = load();
   if (!all[activeDay]) all[activeDay] = {};
   all[activeDay][type] = !all[activeDay][type];
+  const on = all[activeDay][type];
   if (!all[activeDay].duo && !all[activeDay].solo && !all[activeDay].pause) delete all[activeDay];
-  save(all);
+  if (!save(all)) { toast('Kunne ikke lagre'); return; }
   render();
-  toast(type.toUpperCase() + (all[activeDay] && all[activeDay][type] ? ' ✓' : ' fjernet'));
+  toast(type.toUpperCase() + (on ? ' ✓' : ' fjernet'));
 }
 
 function render() { renderStrip(); renderButtons(); renderCal(); renderStats(); }
@@ -521,17 +542,15 @@ function renderCal() {
   const pauseRangeDates = new Set();
   for (let offset = -5; offset <= daysInMo; offset++) {
     const d = new Date(yr, mi, 1 + offset);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if (all[key] && all[key].pause) {
+    if (all[ds(d)] && all[ds(d)].pause) {
       for (let r = 0; r <= 5; r++) {
-        const rd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + r);
-        pauseRangeDates.add(`${rd.getFullYear()}-${String(rd.getMonth()+1).padStart(2,'0')}-${String(rd.getDate()).padStart(2,'0')}`);
+        pauseRangeDates.add(ds(new Date(d.getFullYear(), d.getMonth(), d.getDate() + r)));
       }
     }
   }
 
   for (let day = 1; day <= daysInMo; day++) {
-    const key  = `${yr}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const key  = ds(new Date(yr, mi, day));
     const e    = all[key] || {};
     const cell = document.createElement('div');
     let cls = 'cal-cell';
@@ -568,8 +587,7 @@ function renderStats() {
   const countUpTo = isCurrentMonth ? now.getDate() : daysInMo;
 
   for (let day = 1; day <= daysInMo; day++) {
-    const key = `${yr}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const e   = all[key] || {};
+    const e = all[ds(new Date(yr, mi, day))] || {};
     if (e.duo)  duo++;
     if (e.solo) solo++;
     if (day <= countUpTo) {
@@ -581,11 +599,12 @@ function renderStats() {
   const weeks = elapsedWeeks.size || 1;
   const duoAvg  = (duo  / weeks).toFixed(1);
   const soloAvg = (solo / weeks).toFixed(1);
+  const monthLabel = isCurrentMonth ? 'Denne måneden' : `${MONTHS_NO[mi].slice(0,3)} ${yr}`;
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card">
       <div class="stat-half">
-        <div class="stat-row-label">Denne måneden</div>
+        <div class="stat-row-label">${monthLabel}</div>
         <div class="stat-row-val" style="color:${DUO_C}">${duo}</div>
       </div>
       <div class="stat-half">
@@ -595,7 +614,7 @@ function renderStats() {
     </div>
     <div class="stat-card">
       <div class="stat-half">
-        <div class="stat-row-label">Denne måneden</div>
+        <div class="stat-row-label">${monthLabel}</div>
         <div class="stat-row-val" style="color:${SOLO_C}">${solo}</div>
       </div>
       <div class="stat-half">
@@ -617,9 +636,7 @@ function toast(msg) {
 function exportData() {
   const data = load();
   const json = JSON.stringify(data, null, 2);
-  const today = new Date();
-  const dstr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  const filename = `trening-backup-${dstr}.json`;
+  const filename = `trening-backup-${ds(new Date())}.json`;
   const blob = new Blob([json], { type: 'application/json' });
   const file = new File([blob], filename, { type: 'application/json' });
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -639,8 +656,18 @@ function importData(e) {
   reader.onload = ev => {
     try {
       const parsed = JSON.parse(ev.target.result);
-      if (typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
-      save(parsed);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+      for (const k in parsed) {
+        const v = parsed[k];
+        if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new Error();
+      }
+      const existing = Object.keys(load()).length;
+      if (existing > 0 && !confirm(
+        `Importer ${Object.keys(parsed).length} dager? Dette erstatter alle ${existing} eksisterende dager.`)) {
+        e.target.value = '';
+        return;
+      }
+      if (!save(parsed)) { toast('Kunne ikke lagre'); e.target.value = ''; return; }
       render();
       toast('Data importert ✓');
     } catch {
