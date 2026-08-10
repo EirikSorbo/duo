@@ -1,6 +1,6 @@
 // Service worker for Trening — offline support + durability.
 // Bump CACHE when shipping changes so old caches are cleaned up.
-const CACHE = 'trening-v1';
+const CACHE = 'trening-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', e => {

@@ -39,6 +39,31 @@ body {
   padding-bottom: 40px;
 }
 
+/* TABS */
+.tab-bar {
+  display: flex;
+  height: 40px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--edge);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  cursor: pointer;
+}
+.tab-btn.active { color: var(--ink); border-bottom-color: var(--ink); }
+
 /* WEEK NAV */
 .week-nav {
   display: flex;
@@ -48,7 +73,7 @@ body {
   background: var(--paper);
   border-bottom: 1px solid var(--edge);
   position: sticky;
-  top: 0;
+  top: 40px;
   z-index: 99;
 }
 .week-label {
@@ -283,6 +308,71 @@ body {
 }
 .stat-row-val { font-size: 20px; font-weight: 400; line-height: 1; }
 
+.stat-card-title {
+  padding: 8px 0 7px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.stat-tile {
+  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.stat-tile-wide { grid-column: 1 / -1; }
+
+/* REPORT */
+.seg { display: flex; gap: 5px; padding: 14px 16px 0; }
+.seg-btn {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--edge);
+  border-radius: var(--rs);
+  padding: 9px 0;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.seg-btn.active { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+
+.period-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 14px;
+}
+.period-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.rep-section { padding: 0 16px; }
+.rep-note {
+  font-size: 9px;
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+  color: var(--muted2);
+  padding: 9px 2px 0;
+}
+.rep-block + .rep-block { margin-top: 22px; }
+
 /* APP HEADER */
 .app-header {
   padding: 8px 12px 8px 16px;
@@ -345,6 +435,13 @@ body {
   </div>
 </div>
 
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-reg" onclick="setTab('reg')">Registrering</button>
+  <button class="tab-btn" id="tab-rep" onclick="setTab('rep')">Rapport</button>
+</div>
+
+<div id="view-reg">
+
 <div class="week-nav">
   <button class="nav-btn" onclick="changeWeek(-1)">‹</button>
   <span class="week-label" id="week-label">Uke —</span>
@@ -384,7 +481,27 @@ body {
 <div class="section-divider" style="margin-bottom:14px"></div>
 
 <div class="stats-section">
+  <div class="sub-header">
+    <span class="sub-title" id="stats-period">—</span>
+  </div>
   <div class="stats-grid" id="stats-grid"></div>
+</div>
+
+</div><!-- /view-reg -->
+
+<div id="view-rep" style="display:none">
+  <div class="seg">
+    <button class="seg-btn" id="seg-week" onclick="setPeriod('week')">Uke</button>
+    <button class="seg-btn" id="seg-month" onclick="setPeriod('month')">Måned</button>
+    <button class="seg-btn" id="seg-year" onclick="setPeriod('year')">År</button>
+  </div>
+  <div class="period-nav">
+    <button class="nav-btn" onclick="changePeriod(-1)">‹</button>
+    <span class="period-label" id="period-label">—</span>
+    <button class="nav-btn" onclick="changePeriod(1)">›</button>
+  </div>
+  <div class="section-divider" style="margin-bottom:16px"></div>
+  <div class="rep-section" id="rep-body"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -426,10 +543,22 @@ function isoWeek(d) {
   return [t.getUTCFullYear(), Math.ceil(((t - y1) / 86400000 + 1) / 7)];
 }
 
+const MS_DAY  = 86400000;
+const MONTH_D = 30.4375;   // gjennomsnittlig månedslengde
+
+// Middag på døgnet gjør differansen immun mot sommertid.
+function parseDs(s)   { return new Date(s + 'T12:00:00'); }
+function dayDiff(a,b) { return Math.round((parseDs(b) - parseDs(a)) / MS_DAY); }
+function num(n, dec)  { return n.toFixed(dec).replace('.', ','); }
+
 let weekOff  = 0;
 let monthOff = 0;
 let activeDay = ds(new Date());
 let TODAY    = ds(new Date());
+
+let tab     = 'reg';
+let repType = 'week';
+const repOff = { week: 0, month: 0, year: 0 };
 
 // Recompute "today" when the app is reopened after being left open (e.g. across midnight).
 function refreshToday() {
@@ -456,6 +585,84 @@ function weekOffForDate(dateStr) {
 function changeWeek(n) { weekOff += n; render(); }
 function changeMonth(n) { monthOff += n; renderCal(); renderStats(); }
 
+function setTab(t) {
+  tab = t;
+  document.getElementById('view-reg').style.display = t === 'reg' ? 'block' : 'none';
+  document.getElementById('view-rep').style.display = t === 'rep' ? 'block' : 'none';
+  document.getElementById('tab-reg').classList.toggle('active', t === 'reg');
+  document.getElementById('tab-rep').classList.toggle('active', t === 'rep');
+  if (t === 'rep') renderReport();
+  window.scrollTo(0, 0);
+}
+function setPeriod(p) { repType = p; renderReport(); }
+function changePeriod(n) { repOff[repType] += n; renderReport(); }
+
+/* ---- beregninger ---- */
+
+// Sammenhengende røde dager teller som én pause.
+function pauseEpisodes(all) {
+  const eps = [];
+  Object.keys(all).filter(k => all[k] && all[k].pause).sort().forEach(k => {
+    const prev = eps[eps.length - 1];
+    if (prev && dayDiff(prev.end, k) === 1) prev.end = k;
+    else eps.push({ start: k, end: k });
+  });
+  return eps;
+}
+
+function daysSinceRed(all) {
+  const eps = pauseEpisodes(all).filter(e => e.start <= TODAY);
+  if (!eps.length) return null;
+  return dayDiff(eps[eps.length - 1].start, TODAY);
+}
+
+function avgPauseGap(all) {
+  const eps = pauseEpisodes(all);
+  if (eps.length < 2) return null;
+  let sum = 0;
+  for (let i = 1; i < eps.length; i++) sum += dayDiff(eps[i-1].start, eps[i].start);
+  return sum / (eps.length - 1);
+}
+
+function countRange(all, startKey, endKey) {
+  let duo = 0, solo = 0;
+  for (const k in all) {
+    if (k < startKey || k > endKey) continue;
+    const e = all[k] || {};
+    if (e.duo)  duo++;
+    if (e.solo) solo++;
+  }
+  return { duo, solo, sum: duo + solo };
+}
+
+function periodRange(type, off) {
+  const now = new Date(); now.setHours(0,0,0,0);
+  let s, e, label;
+  if (type === 'week') {
+    s = mondayOf(now); s.setDate(s.getDate() + off * 7);
+    e = new Date(s);   e.setDate(s.getDate() + 6);
+    const [wy, wk] = isoWeek(s);
+    label = `Uke ${wk} · ${wy}`;
+  } else if (type === 'month') {
+    s = new Date(now.getFullYear(), now.getMonth() + off, 1);
+    e = new Date(s.getFullYear(), s.getMonth() + 1, 0);
+    label = `${MONTHS_NO[s.getMonth()]} ${s.getFullYear()}`;
+  } else {
+    s = new Date(now.getFullYear() + off, 0, 1);
+    e = new Date(s.getFullYear(), 11, 31);
+    label = `${s.getFullYear()}`;
+  }
+  return { startKey: ds(s), endKey: ds(e), label };
+}
+
+// Snittene måles mot dagene som faktisk har gått i perioden, aldri mot mindre enn en uke.
+function periodDays(startKey, endKey) {
+  const full = dayDiff(startKey, endKey) + 1;
+  if (startKey > TODAY) return full;
+  const endEff = endKey > TODAY ? TODAY : endKey;
+  return dayDiff(startKey, endEff) + 1;
+}
+
 function toggle(type) {
   const all = load();
   if (!all[activeDay]) all[activeDay] = {};
@@ -467,7 +674,10 @@ function toggle(type) {
   toast(type.toUpperCase() + (on ? ' ✓' : ' fjernet'));
 }
 
-function render() { renderStrip(); renderButtons(); renderCal(); renderStats(); }
+function render() {
+  renderStrip(); renderButtons(); renderCal(); renderStats();
+  if (tab === 'rep') renderReport();
+}
 
 function renderStrip() {
   const dates = weekDates();
@@ -572,57 +782,99 @@ function renderCal() {
   }
 }
 
+function tile(label, val, color, wide) {
+  return `
+    <div class="stat-tile${wide ? ' stat-tile-wide' : ''}">
+      <div class="stat-row-label">${label}</div>
+      <div class="stat-row-val"${color ? ` style="color:${color}"` : ''}>${val}</div>
+    </div>`;
+}
+
 function renderStats() {
   const base = new Date();
   const m  = new Date(base.getFullYear(), base.getMonth() + monthOff, 1);
   const yr = m.getFullYear();
   const mi = m.getMonth();
   const all = load();
-  const daysInMo = new Date(yr, mi + 1, 0).getDate();
 
-  let duo = 0, solo = 0;
-  const elapsedWeeks = new Set();
+  const startKey = ds(new Date(yr, mi, 1));
+  const endKey   = ds(new Date(yr, mi + 1, 0));
+  const c = countRange(all, startKey, endKey);
+
   const now = new Date();
   const isCurrentMonth = (yr === now.getFullYear() && mi === now.getMonth());
-  const countUpTo = isCurrentMonth ? now.getDate() : daysInMo;
+  document.getElementById('stats-period').textContent =
+    isCurrentMonth ? 'Denne måneden' : `${MONTHS_NO[mi]} ${yr}`;
 
-  for (let day = 1; day <= daysInMo; day++) {
-    const e = all[ds(new Date(yr, mi, day))] || {};
-    if (e.duo)  duo++;
-    if (e.solo) solo++;
-    if (day <= countUpTo) {
-      const [wy, wk] = isoWeek(new Date(yr, mi, day));
-      elapsedWeeks.add(`${wy}-${wk}`);
-    }
-  }
+  const since = daysSinceRed(all);
 
-  const weeks = elapsedWeeks.size || 1;
-  const duoAvg  = (duo  / weeks).toFixed(1);
-  const soloAvg = (solo / weeks).toFixed(1);
-  const monthLabel = isCurrentMonth ? 'Denne måneden' : `${MONTHS_NO[mi].slice(0,3)} ${yr}`;
+  document.getElementById('stats-grid').innerHTML =
+    tile('Duo', c.duo, DUO_C) +
+    tile('Solo', c.solo, SOLO_C) +
+    tile('Tid siden rød', since === null ? '—' : since, PAUSE_C) +
+    tile('Sum', c.sum);
+}
 
-  document.getElementById('stats-grid').innerHTML = `
+function renderReport() {
+  const all = load();
+  const { startKey, endKey, label } = periodRange(repType, repOff[repType]);
+
+  document.getElementById('period-label').textContent = label;
+  ['week','month','year'].forEach(t =>
+    document.getElementById('seg-' + t).classList.toggle('active', t === repType));
+
+  const c    = countRange(all, startKey, endKey);
+  const dDen = Math.max(7, periodDays(startKey, endKey));
+  const wk   = n => num(n * 7 / dDen, 1);
+  const mo   = n => num(n * MONTH_D / dDen, 1);
+
+  const since = daysSinceRed(all);
+  const gap   = avgPauseGap(all);
+
+  const card = (name, color, n) => `
     <div class="stat-card">
+      <div class="stat-card-title" style="background:${color}">${name}</div>
       <div class="stat-half">
-        <div class="stat-row-label">${monthLabel}</div>
-        <div class="stat-row-val" style="color:${DUO_C}">${duo}</div>
+        <div class="stat-row-label">Antall</div>
+        <div class="stat-row-val">${n}</div>
       </div>
       <div class="stat-half">
         <div class="stat-row-label">Ukentlig snitt</div>
-        <div class="stat-row-val" style="color:${DUO_C}">${duoAvg}</div>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-half">
-        <div class="stat-row-label">${monthLabel}</div>
-        <div class="stat-row-val" style="color:${SOLO_C}">${solo}</div>
+        <div class="stat-row-val">${wk(n)}</div>
       </div>
       <div class="stat-half">
-        <div class="stat-row-label">Ukentlig snitt</div>
-        <div class="stat-row-val" style="color:${SOLO_C}">${soloAvg}</div>
+        <div class="stat-row-label">Månedlig snitt</div>
+        <div class="stat-row-val">${mo(n)}</div>
+      </div>
+    </div>`;
+
+  document.getElementById('rep-body').innerHTML = `
+    <div class="rep-block">
+      <div class="sub-header"><span class="sub-title">I perioden</span></div>
+      <div class="stats-grid">
+        ${card('Duo', DUO_C, c.duo)}
+        ${card('Solo', SOLO_C, c.solo)}
+      </div>
+      <div class="stats-grid" style="margin-top:8px">
+        ${tile('Sum', c.sum, null, true)}
+      </div>
+      <div class="rep-note">
+        Snittene er takt: antallet omregnet til uke og måned ut fra hvor mange dager
+        av perioden som har gått${repOff[repType] === 0 ? ' så langt' : ''}.
       </div>
     </div>
-  `;
+
+    <div class="rep-block">
+      <div class="sub-header"><span class="sub-title">Røde dager</span></div>
+      <div class="stats-grid">
+        ${tile('Tid siden rød', since === null ? '—' : since, PAUSE_C)}
+        ${tile('Snitt mellom røde', gap === null ? '—' : Math.round(gap), PAUSE_C)}
+      </div>
+      <div class="rep-note">
+        Regnet av hele historikken, ikke av valgt periode. Sammenhengende røde dager
+        teller som én pause.
+      </div>
+    </div>`;
 }
 
 function toast(msg) {
